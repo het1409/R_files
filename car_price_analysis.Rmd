@@ -1,0 +1,438 @@
+---
+title: "CS5801 Coursework Template Proforma"
+author: "2329524"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+version: 1
+---
+
+# 0. Instructions 
+
+
+
+```{r}
+# Add code here to load all the required libraries with `library()`.
+
+# Do not include any `install.package()` for any required packages in this rmd file.
+library(dplyr)
+library(ggplot2)
+library(Hmisc)
+# library(tidyverse)
+```
+
+
+# 1. Organise and clean the data
+
+## 1.1 Subset the data into the specific dataset allocated
+
+
+```{r}
+# Only change the value for SID 
+# Assign your student id into the variable SID, for example:
+SID <- 2329524                  # This is an example, replace 2101234 with your actual ID
+SIDoffset <- (SID %% 50) + 1    # Your SID mod 50 + 1
+
+load("car-analysis-data.Rda")
+# Now subset the car data set
+# Pick every 50th observation starting from your offset
+# Put into your data frame named mydf (you can rename it)
+mydf <- cars.analysis[seq(from=SIDoffset,to=nrow(cars.analysis),by=50),]
+
+```
+
+
+## 1.2 Data quality analysis plan
+ 
+
+
+### To analyze any data quality issues, following steps would be considered to perform data quality checks:-
+
+__1. Summarizing the dataset:__
+- First of all, data set will be summarized to get an overview of the data like mean, median, the type of variable such as Categorical, Numerical and binary, so that potential issues can be found and modelling of data becomes easy.
+
+__2. Check for NA's (missing values):__
+- Analyse the summarized data and check if there are any missing values (NA's) in the dataset which can affect further analyses such as EDA, modeling or any relationship testing and based on the type of variable, either the imputation can be done or values can be dropped.
+
+__3. Check for Duplicates:__
+- Check If there are any duplicates that might affect the analysis of the data and the data accuracy.
+
+__4. Check for Negative values:__
+- Check if there are any negative values in any columns which are continuous that affects the mean of the particular variables.
+
+__5. Check for spelling errors, merging errors (extra space):__
+- Check if there is any spelling errors in the column which are categorical which can affect the EDA process or while checking relationship between different variables.
+
+
+
+## 1.3 Data quality analysis findings
+
+
+### Data Types
+
+- __Numerical:-__
+  1. year
+  2. mileage
+  3. engine_size
+  4. min_mpg
+  5. max_mpg - Negative values found in the data
+  6. price
+
+- __Categorical__
+  1. Brand:-  25 brands
+  2. Fuel:- Petrol, Hybrid, GPL. Typographical errors found, __UNKNOWN__ categories found in the data
+  3. Drivetrain:- Four-wheel Drive, Rear-wheel Drive. __UNKNOWN__ categories found in the data
+  
+- __Binary__ (*0 or 1*)
+  1. Automatic Transmission
+  2. Damaged
+  3. First Owner
+  4. Navigation System
+  5. Bluetooth
+  6. Third Row Seating
+  7. Heated seats
+  
+__2. NA's (missing values) in the data__
+
+- Total __167 NA's__ in the data
+  - engine_size __[20]__ NA's
+  - min_mpg __[64]__ NA's
+  - max-mpg __[64]__ NA's
+  - first_owner __[11]__ NA's
+  - damaged __[8]__ NA's
+  
+
+```{r}
+#summarize the data
+summary(mydf)
+str(mydf)
+#To calculate number of NA's in the table
+colSums(is.na(mydf))
+sum(is.na(mydf))
+
+#Further exploration of data for each column
+unique(mydf$fuel)
+unique(mydf$drivetrain)
+unique(mydf$brand)
+
+#random imputation
+# mydf$max_mpg = with(mydf, impute(max_mpg, "random"))
+
+#Replacing `negative values` and `NA's` by doing median imputation of max_mpg
+median_max_mpg = median(mydf$max_mpg[mydf$max_mpg > 0], na.rm = TRUE)
+mydf$max_mpg[mydf$max_mpg < 0] = median_max_mpg
+mydf$max_mpg[is.na(mydf$max_mpg)] = median_max_mpg
+
+#Replacing NA's with median values of min_mpg
+median_min_mpg = median(mydf$min_mpg[mydf$min_mpg > 0], na.rm = TRUE)
+mydf$min_mpg[is.na(mydf$min_mpg)] = median_min_mpg
+
+#Dropping NA values for categorical values (enginesize)
+median_engine_size = median(mydf$engine_size[mydf$engine_size > 0], na.rm = TRUE)
+mydf$engine_size[is.na(mydf$engine_size)] = median_engine_size
+
+#Checking if there are anyduplicates
+duplicate_val = sum(duplicated(mydf))
+duplicate_val
+
+#Drop NA values for categorical values (damaged, first_owner)
+mydf = mydf %>%
+  filter(!is.na(mydf$damaged))
+
+mydf = mydf %>%
+  filter(!is.na(mydf$first_owner))
+
+#Drop "Unknown" values in drivetrain
+mydf = mydf %>%
+  filter(drivetrain != "Unknown")
+
+#Check for spelling errors
+mydf[mydf$fuel == "Pertol", "fuel"] = "Petrol"
+unique(mydf$fuel)
+table(mydf$fuel)
+
+summary(mydf)
+
+```
+
+ 
+## 1.4 Data cleaning  
+
+
+### While asessing the data, following data quality issues were found:
+
+__1. There were negative values in column `max_mpg`:__
+  - Identified the negative values in this column and addressed this issue by replacing those values by implementing median imputation of the non-negative values in a way that it doesn't affect the median.
+  
+__2. Total 167 missing values were found (i.e. NA's) from `min_mpg`, `max_mpg`, `enginesize`, `damaged`, `first_owner`:__
+  - Missing values for `min_mpg`, `max_mpg`, `enginesize` were replaced by again implementing median imputation and for `damaged` and `first_owner`, the missing values were dropped using `filter` function of deplyr package as those variables are binary and cannot be imputed.
+  
+__3. Spelling error was found in the column `fuel` and to find more details, `unique` function is being used:__
+  - While doing further data analysis, spelling error was found such as __"Pertol"__ instead of __"Petrol"__ and corrected the spelling by replacing it with the correct one. Additionally there was one "Unknown" value which was dropped as well by using the same dplyr package and filter function.
+  
+__4. In column `drivetrain` "Unknown" values were found, and similarly used `unique` function to find more details:__
+  - In the same way, Unknown values were filtered out(dropped) for the drivetrain using same dplyr package.
+
+
+# 2. Exploratory Data Analysis (EDA)
+
+## 2.1 EDA plan
+
+- Analyse the different variables present in the dataset. Examine the data to check its type, i.e. categorical, numerical or binary.
+- Binary data can be in different forms such as in this case, `damaged`, or `first_owner`, and others with __0 and 1__ values.
+- Therefore, according the types of data, different graphs can be used such as pie chart for categorical variables, histogram for numerical values, bar graph to compare numerical and categorical values. 
+- Scatter graph can be used for continuous variables such as `max_mpg`, `min_mpg` to check if there are any outliers or pattern in the data.
+- To get more more insights, different graphs can be plotted using different variables. 
+
+## 2.2 EDA execution   
+
+- Different graphs such as __price vs brand__, __price vs fuel__, __price vs drivetrain__ can be plotted using either bar graph or boxplots.
+- For continuous variables such as __max_mpg__, __min_mpg__ scatter plots can more beneficial to analyse the trends in the graph.
+- Box plots can also be useful to check the presence of outliers in the graph. 
+- But before plotting the graphs for binary variables with 0 and 1, it should be converted into factor. Because analyzing the data in the same form (__i.e. 0 or 1__) will not be helpful to analyse the relation =ship between the data.
+
+```{r}
+
+# summary(mydf)
+
+#Graph:1 Average Price By Brand
+ggplot(data = mydf, aes(x = reorder(brand, price), y = price, fill = brand)) + geom_bar(stat = "summary", fun  = "mean") +
+   labs(title = "Average Price by brand", x = "Brands", y = "Price") + theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+#Graph:2 Average Price By Fuel
+ggplot(data = mydf, aes(x = reorder(fuel,price), y = price, fill = fuel)) + geom_bar(stat = "summary", fun = "mean") + labs(title = "Average price by fuel", x = "Fuel", y = "Price")
+
+
+#Graph:3 Average Price By Drivetrain
+ggplot(data = mydf, aes(x = reorder(drivetrain, price), y = price, fill = drivetrain)) + geom_bar(stat = "summary", fun = "mean") + labs(title = "Average price by drivetrain") + labs(title = "Average price by Drivetrain") + labs(title = "Average price by Drivetrain", x = "Drivetrain", y = "Price")
+
+
+#Graph:4 Average Price by Damaged
+
+#Coverting variable damaged into factor
+mydf$damaged = factor(mydf$damaged, levels = c(0,1), labels = c("Not Damaged", "Damaged"))
+ggplot(data = mydf, aes(x = damaged, y = price, fill = damaged)) + geom_boxplot() + labs(title = "Average price by Damaged", x = "Damaged", y = "Price")
+
+#Graph:5 Average Price by Owner
+
+#converting variable first_owner into factor
+mydf$first_owner = factor(mydf$first_owner, levels = c(0,1), labels = c("Not first Owner", "First owner"))
+
+ggplot(data = mydf, aes(x = first_owner, y = price, fill = first_owner)) + geom_boxplot() + labs(title = "Average Price by Owner", x = "Car Owner", y = "Price")
+
+
+# Graph:6 Year Vs Price
+
+ggplot(data = mydf, aes(x = year, y = price)) + geom_point() + geom_smooth() + labs(title = "Year Vs Price", x = "Year", y = "Price")
+
+# Graph:7 Owner Vs Year
+
+ggplot(data = mydf, aes(x = first_owner, y = year, fill = first_owner)) + geom_boxplot() + labs(title = "Owner Vs Year", x = "Car Owner", y = "Year")
+```
+
+
+
+
+## 2.3 EDA summary of results
+
+### Graph: 1 Average Price BY Brand
+
+- As shown in __graph: 1__, as per bar graph, different prices based on different model is showcased. According to the graph, the lowest price among all the brand is __Suzuki__ which has an average price 5,000 compared to __Land__ which is highest among all with an average price around 35,000.
+- Additionally, the similar price can be seen for __Jeep__ and __Kia__ with a price range betwenn 25,000 and 30,000.
+- To adjust the brand names, theme function is used to adjust the text using ```axis.text.x``` and setting the angle to 45.
+
+### Graph: 2 Average Price BY Fuel
+
+- As per bar graph in __graph: 2__, it can be seen that the price of __Hybrid__ car is 35,000 which is highest among all the fuel types, and lowest being the __GPL__ with a price of 20,000.
+- Overall, we can conclude from the graph that as the fuel type (__GPL__ to __Hybrid__)changes, the price of the car increases with it.
+
+### Graph: 3 Average Price By Drivetrain
+
+- According to the graph in __Graph: 4__, the price of __Four-Wheel Drive__ is around 35,000 which is highest among all. The price of __Front-wheel Drive__ is around 20,000 which is lowest among all.
+- Moreover, the price of __Rear-wheel__ Drive is quite similar to __Four-Wheel Drive__ which is around 30,000. Overall it can be analyzed that as the type of drive changes, the price increases with it.
+
+### Graph: 4 Average Price By Damaged
+
+- The boxplot in __Graph: 4__ shows the price of the car based on the condition of the car. It reveals that the price on the non-damaged car is higher than that of damaged ones.
+- The price of the non-damaged ones is 30,000 and for the damaged ones, the price is around 25,000.
+
+### Graph: 5 Average Price By Owner
+
+- Here, __Not first owner__ does not mean that the car is new, it means that its not an first owner, but maybe second owner or third or subsequent owners.
+- According to __Graph: 5__, there is a significant difference in price between the first owner and other subsequent owners.
+- The price for the first owner car is around 32,000 and for other owners, the price is around 25,000 which is much lower than that of first owner.
+
+## 2.4 Additional insights and issues
+
+### Additional findings:-
+
+- In __Graph: 5__, outlier can be seen for "__Not first owner__". This might affect the overall data analysis but it still gives an effecient output which can be used for further exploration. 
+- in __Graph: 6__, from the scatter of __Year Vs Price__, it can be found that the price for the recent year is higher than the older years.
+- However, there is curve in the graph for years between 1990 and 2000. In 2000, the price goes below 10000, but after 2000 there is increment in the price.
+- Now, for __Graph: 7__, the outliers can be seen for both First owner and Not first owner. There are many outliers and this might affect the overall analysis of the data. Therefore, to get better results, these outliers should be removed if possible.
+
+# 3. Modelling
+
+## 3.1 Explain your analysis plan
+
+
+### Modelling plan for __"car prices"__
+
+__1. Analyze the data__
+
+- First step is to analyze the data to check for the suitable variables to model a car price. This can be done with the help of EDA and summary statistics.
+- EDA will give further insights into the dataset through which variables affecting the car prices can be identified. It will also help to find potential relationship between the variables.
+
+__2. Finding the variables__
+
+- Based on the findings from EDA, variables affecting the car prices can now be selected to make a model. Although its not necessary that the variable will potentially be a good fit.
+- Different variables should be taken into consideration while making the model.
+
+__3. Which model to use (Linear Regression/Multiple Linear Regression)__
+
+- Based on the number of variables, decide which type of model (LR/MLR) to use to make a model for car price.
+- If there is a single variable taken, linear model will be use and for different variable, multiple regression will be used.
+
+__4. Evaluating if the model is a good fit__
+
+- After taking all the key variables affecting the car price, evaluate the model to check if there is a good fit.
+- It can be achieved by looking in the outputs of different models. 
+- Different measures should be considered while deciding the model fit, such as `p-value`, `r-sqaured` and by looking the different graph such as __Residuals vs Fitted__ and __Q-Q Residuals__ which are two important graphs to look at while deciding the model fit.
+ 
+## 3.2 Build a model for car price
+ 
+
+### Model for __car price__
+
+- To build a suitable model for a car price, different variable should be taken into consideration.
+- To find out the potential car price model different variables such as `first_owner`, `mileage`, `engine_size`, `min_mpg`, `max_mpg`, and `derivetrain` can be used against car price. 
+- Each of the above mentioned variable will give different results and based on those results such as r-squared, and p-value.  
+- To check if the model is a good fit, plots of all the tested models are analysed and more specifically, plots of __residuals vs fitted__, and __Q-Q residuals__ will give more insights about the model.
+
+```{r}
+# To analyze relationship between "price" and "first_owner"
+
+model_1 = lm(mydf$price~mydf$first_owner, data = mydf)
+summary(model_1)
+plot(model_1)
+```
+
+```{r}
+# To analyze relationship between "price" and "mileage"
+
+model_2 = lm(mydf$price~mydf$mileage, data = mydf)
+summary(model_2)
+plot(model_2)
+```
+
+
+```{r}
+#Making model with multiple regression 
+
+model_3 = lm(mydf$price ~ mydf$engine_size + mydf$min_mpg + mydf$max_mpg)
+summary(model_3)
+plot(model_3)
+```
+
+```{r}
+model_4 = lm(mydf$price ~ mydf$drivetrain + mydf$engine_size)
+summary(model_4)
+plot(model_4)
+```
+
+```{r}
+model_5 = lm(price ~ . , data=mydf)
+summary(model_5)
+plot(model_5)
+```
+
+## 3.3 Critique model using relevant diagnostics
+
+- From the above model tested, from __model_1__ to __model_5__, every models provided different test results.
+- All the models resulted into different p-values and r-square. Although the  p-value is much significant for all models, but the r-squared is much lower except __model_5__, which reflected potential results, and can be said that the model is a good fit.
+- To make the model a good fit, the r-squared should be near to 1.
+- Apart from these measures, the graphs of the model also showed different results.
+- But for __model_5__, the p-value as well as r-squared, is 0.05 and 0.78, which shows that model is a good fit.
+- Although the graphs for __model_5__ shows some patter, overall the model is a good fit.
+_ There are some outliers that can be found in the graphs.
+- While according to the graphs of __model_3__, it can be good model, but the r-squared is too low. Therefore, to find potential in model_3, further analysis might be helpful.
+
+## 3.4 Suggest and implement improvements to your model
+
+
+## Addressing Model weakness:-
+
+- The proposed final model is __model_5__, analyzing the results provided by the model such as r-squared, p-values, and graphs, these details reflects that the model_5 can be the potential model for car prices.
+- But for more accurate results and better results, it can be refined to achieve better values for r-squared and more accurate graph.
+- Therefore, one alternative approach is to use `log` function, because it can be useful to handle different types as well as handling errors. Further more it can normalize the data.
+- In below implementation, using `log` function, there are significant difference in the results for model_5, such as the r-squared went from __0.77__ to __0.84__ and F-statistic went from __34.08__ to __51.29__.
+- After implementing `log` function, it can be said that model became more accurate. Moreover, the residual standard error showed the huge difference, which went down from 5588 to 0.1958 which reveals that the model has small errors while predicting prices.
+
+```{r}
+final_model = lm(log(price) ~ ., data = mydf)
+summary(final_model)
+plot(final_model)
+```
+
+
+# 4. Modelling another dependent variable
+
+## 4.1 Model the likelihood of a car being sold by the first owner (using the first_owner variable provided).
+
+
+## Analysis Plan:- 
+
+- To model the likelihood of the car being sold by the first owner, first different variables should be taken into consideration such as price, damaged, mileage and other potential variables with might give potential outputs.
+- From the different graphs shown in EDA, such as __Average Price By Owner__, __year Vs price__  can be helpful while modelling.
+- Every model will give different outputs, so to find the good fit, different values should be taken into consideration such as AIC which will help to identify the fit of the model. But just looking at AIC, it cannot be said that the model is a good fit. It is also necessary to look at p-values, how other variables are affecting the overall model.
+- To achieve a good fit, multiple variables should be taken into consideration. Although the model will become more complex, it is necessary to evaluate model by taking multiple factors into consideration.
+
+```{r}
+
+m1 = glm(first_owner ~ price, data = mydf, family = binomial)
+summary(m1)
+
+m2 = glm(first_owner ~ damaged + price, data = mydf, family = binomial)
+summary(m2)
+
+m3 = glm(first_owner ~ mileage + price, data = mydf, family = binomial)
+summary(m3)
+
+m4 = glm(first_owner ~ mileage + price + damaged + year, data = mydf, family = binomial)
+summary(m4)
+
+# m = step(m4)
+# summary(m)
+
+m5 = glm(first_owner ~ ., data=mydf, family=binomial)
+summary(m5)
+
+# model_s = step(m5)
+# summary(model_s)
+```
+
+
+# Explanation of different models:-
+
+- For first model (__m1__), the variable taken is price as it will help to analyze if the car is sold by the first owner. But according to model the AIC is 498 which can be a good fit. But it necessary to check all the model (i.e. __m1__ to __m5__) and compare them. The p-value is also significantly low and for every one unit increase in price, the odds for the car sold by first owner increases by the factor of 6.6.
+- As for second model (__m2__), the AIC is 488.35 which is lower than __m1__, and the p-value is also lower than 0.5. Multiple variable such as ```damaged``` and ```price``` was used to create a model. While this model can be a good fit, it is necessary to analyze other variables as mentioned.
+- In third model (__m3__), again multiple variables are taken such as ```mileage``` and ```price```. The AIC of the m3 is much lower than other models __m1__ and __m2__. But for every one unit increase in mileage the odds decreases. Overall the p-value suggests that there is a significant effect of the car being sold by the first owner.
+- But model 4 (__m4__) stands out among all models. The AIC of this model is significantly lower than other three models which is 451.75. The p-value suggests that mileage, damaged and year has significant effect on the car being sold by the first owner.
+
+
+# Proposed Model:-
+
+- From all the models, model 4 (__m4__) is a good fit with lower AIC (__451.75__) among others. Additionally, the factors such as mileage, damaged, and year with lower p-value suggests that there is a significant change for the car being sold by the first owner. While for price, whose p-value is 0.5, which has very less effect as compared to other factors.
+- To refine __m4__ which is the suitable one, `step` function can be useful for the improvement in AIC.
+- It will not only reduce the AIC but also iterate through every variables till the significant result is provided. Therefore it will help to reduce the overall complexity of the data by reducing the number of factors. Although the model is sufficient, it is important to do further exploration of data to reveal more insights.
+
+
+# References  
+
+*The code for adjusting the x-axis text angle was provided by OpenAI's ChatGPT, a language model developed by OpenAI.*
+
+*Add any references here including references to use of GenAI. NB You can either do this manually or automatically with a `.bib` file (which then must be submitted along with your `.Rmd` file).  See the RMarkdown [documentation](https://bookdown.org/yihui/rmarkdown-cookbook/bibliography.html) for guidance.*    
